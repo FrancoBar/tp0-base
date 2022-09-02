@@ -12,6 +12,19 @@ services:
     networks:
       - testing_net
 
+  testserver:
+    container_name: testserver
+    image: testserver:latest
+    entrypoint: sh test.sh
+    environment:
+      - TEST_WORD=test
+      - SERVER_ADDRESS=server
+      - SERVER_PORT=12345
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
   client1:
     container_name: client1
     image: client:latest
