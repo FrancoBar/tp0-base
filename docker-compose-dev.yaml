@@ -9,6 +9,10 @@ services:
       - SERVER_PORT=12345
       - SERVER_LISTEN_BACKLOG=7
       - LOGGING_LEVEL=DEBUG
+    volumes:
+      - type: bind
+        source: ./.data/config/server.ini
+        target: /config.ini
     networks:
       - testing_net
 
@@ -19,8 +23,12 @@ services:
     environment:
       - CLI_ID=1
       - CLI_SERVER_ADDRESS=server:12345
-      - CLI_LOOP_LAPSE=1m2s
-      - CLI_LOG_LEVEL=DEBUG
+      #- CLI_LOOP_LAPSE=1m2s
+      #- CLI_LOG_LEVEL=DEBUG
+    volumes:
+      - type: bind
+        source: ./.data/config/client.yaml
+        target: /config.yaml
     networks:
       - testing_net
     depends_on:
