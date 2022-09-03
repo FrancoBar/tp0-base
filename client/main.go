@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"os"
+	"os/signal"
+    "syscall"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -101,6 +104,11 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	client := common.NewClient(clientConfig)
+	// Create signal channel
+	signals := make(chan os.Signal, 1)
+    signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+
+	client := common.NewClient(clientConfig, signals)
 	client.StartClientLoop()
+	log.Infof("[CLIENT %v] Shutting down...", clientConfig.ID)
 }

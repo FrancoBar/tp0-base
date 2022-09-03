@@ -4,6 +4,7 @@ import logging
 
 class Server:
     def __init__(self, port, listen_backlog):
+        self._open = True
         # Initialize server socket
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
@@ -18,11 +19,17 @@ class Server:
         finishes, servers starts to accept new connections again
         """
 
-        # TODO: Modify this program to handle signal to graceful shutdown
-        # the server
-        while True:
+        while self._open:
             client_sock = self.__accept_new_connection()
-            self.__handle_client_connection(client_sock)
+            if client_sock:
+                self.__handle_client_connection(client_sock)
+        logging.info('Shutting down...')
+
+    def sigterm_handler(self, signum, frame):
+        logging.debug('SIGTERM received')
+        self._open = False
+        logging.debug('Closing socket')
+        self._server_socket.close()
 
     def __handle_client_connection(self, client_sock):
         """
@@ -38,8 +45,10 @@ class Server:
                 .format(client_sock.getpeername(), msg))
             client_sock.send("Your Message has been received: {}\n".format(msg).encode('utf-8'))
         except OSError:
-            logging.info("Error while reading socket {}".format(client_sock))
+            if self._open:
+                logging.info("Error while reading socket {}".format(client_sock))
         finally:
+            logging.debug("Client socket closed")
             client_sock.close()
 
     def __accept_new_connection(self):
@@ -52,6 +61,11 @@ class Server:
 
         # Connection arrived
         logging.info("Proceed to accept new connections")
-        c, addr = self._server_socket.accept()
-        logging.info('Got connection from {}'.format(addr))
+        try:
+            c, addr = self._server_socket.accept()
+            logging.info('Got connection from {}'.format(addr))
+        except OSError:
+            if self._open:
+                logging.info("Error while reading socket {}".format(self._server_socket))
+            c = None
         return c
