@@ -1,11 +1,10 @@
 package common
 
 import (
-	"bufio"
-	"fmt"
 	"net"
 	"time"
-
+	"fmt"
+	"bufio"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,16 +16,26 @@ type ClientConfig struct {
 	LoopPeriod    time.Duration
 }
 
+// Record used by the client to represent a person
+type PersonRecord struct {
+	Name string
+	Surname string
+	Dni uint32
+	Birthdate string
+}
+
 // Client Entity that encapsulates how
 type Client struct {
+	person PersonRecord
 	config ClientConfig
 	conn   net.Conn
 }
 
 // NewClient Initializes a new client receiving the configuration
 // as a parameter
-func NewClient(config ClientConfig) *Client {
+func NewClient(config ClientConfig, person PersonRecord) *Client {
 	client := &Client{
+		person: person,
 		config: config,
 	}
 	return client
@@ -49,50 +58,35 @@ func (c *Client) createClientSocket() error {
 }
 
 // StartClientLoop Send messages to the client until some time threshold is met
-func (c *Client) StartClientLoop() {
-	// Create the connection the server in every loop iteration. Send an
-	// autoincremental msgID to identify every message sent
+func (c *Client) Start() {
 	c.createClientSocket()
-	msgID := 1
-
-loop:
-	// Send messages if the loopLapse threshold has been not surpassed
-	for timeout := time.After(c.config.LoopLapse); ; {
-		select {
-		case <-timeout:
-			break loop
-		default:
-		}
-
-		// Send
-		fmt.Fprintf(
-			c.conn,
-			"[CLIENT %v] Message N°%v sent\n",
-			c.config.ID,
-			msgID,
-		)
-		msg, err := bufio.NewReader(c.conn).ReadString('\n')
-		msgID++
-
-		if err != nil {
-			log.Errorf(
-				"[CLIENT %v] Error reading from socket. %v.",
-				c.config.ID,
-				err,
-			)
-			c.conn.Close()
-			return
-		}
-		log.Infof("[CLIENT %v] Message from server: %v", c.config.ID, msg)
-
-		// Wait a time between sending one message and the next one
-		time.Sleep(c.config.LoopPeriod)
-
-		// Recreate connection to the server
-		c.conn.Close()
-		c.createClientSocket()
+	
+	// Send
+	fmt.Println("Envío persona")
+	Send(c.conn, AskWinner, c.person)
+	fmt.Println("Espero respuesta")
+	reader := bufio.NewReader(c.conn)
+	isWinner := RecvBool(reader)
+	if isWinner{
+		fmt.Println("Es Ganador")
+	}else{
+		fmt.Println("No es un Ganador")
 	}
+	
+	//Read
+	// msg, err := bufio.NewReader(c.conn).ReadString('\n')
+	// msgID++
 
-	log.Infof("[CLIENT %v] Closing connection", c.config.ID)
+	// if err != nil {
+	// 	log.Errorf(
+	// 		"[CLIENT %v] Error reading from socket. %v.",
+	// 		c.config.ID,
+	// 		err,
+	// 	)
+	// 	c.conn.Close()
+	// 	return
+	// }
+	// log.Infof("[CLIENT %v] Message from server: %v", c.config.ID, msg)
+
 	c.conn.Close()
 }

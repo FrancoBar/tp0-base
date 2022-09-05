@@ -36,6 +36,11 @@ func InitConfig() (*viper.Viper, error) {
 	v.BindEnv("loop", "lapse")
 	v.BindEnv("log", "level")
 
+	v.BindEnv("name")
+	v.BindEnv("surname")
+	v.BindEnv("dni")
+	v.BindEnv("birthdate")
+
 	// Try to read configuration from config file. If config file
 	// does not exists then ReadInConfig will fail but configuration
 	// can be loaded from the environment variables so we shouldn't
@@ -101,6 +106,13 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	client := common.NewClient(clientConfig)
-	client.StartClientLoop()
+	p := common.PersonRecord{
+		Name: "Eva",
+		Surname: "Martinez",
+		Dni: 123456789,
+		Birthdate: "12-12-1998",
+	}
+
+	client := common.NewClient(clientConfig, p)
+	client.Start()
 }
