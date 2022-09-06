@@ -3,7 +3,6 @@ package common
 import (
 	"net"
 	"time"
-	"fmt"
 	"bufio"
 	log "github.com/sirupsen/logrus"
 )
@@ -18,9 +17,9 @@ type ClientConfig struct {
 
 // Record used by the client to represent a person
 type PersonRecord struct {
-	Name string
-	Surname string
-	Dni uint32
+	FirstName string
+	LastName string
+	Document uint64
 	Birthdate string
 }
 
@@ -62,31 +61,28 @@ func (c *Client) Start() {
 	c.createClientSocket()
 	
 	// Send
-	fmt.Println("Envío persona")
-	Send(c.conn, AskWinner, c.person)
-	fmt.Println("Espero respuesta")
+	log.Infof("Sending person query")
+	err := Send(c.conn, AskWinner, c.person)
+	if err != nil{
+		log.Errorf("[CLIENT %v] %v", c.config.ID, err)
+		c.conn.Close()
+		return
+	}
+
+	log.Infof("Awaiting server answer")
 	reader := bufio.NewReader(c.conn)
-	isWinner := RecvBool(reader)
+	isWinner, err := RecvBool(reader)
+	if err != nil{
+		log.Errorf("[CLIENT %v] %v", c.config.ID, err)
+		c.conn.Close()
+		return
+	}
+
 	if isWinner{
-		fmt.Println("Es Ganador")
+		log.Infof("It's a winner")
 	}else{
-		fmt.Println("No es un Ganador")
+		log.Infof("It isn't a winner")
 	}
 	
-	//Read
-	// msg, err := bufio.NewReader(c.conn).ReadString('\n')
-	// msgID++
-
-	// if err != nil {
-	// 	log.Errorf(
-	// 		"[CLIENT %v] Error reading from socket. %v.",
-	// 		c.config.ID,
-	// 		err,
-	// 	)
-	// 	c.conn.Close()
-	// 	return
-	// }
-	// log.Infof("[CLIENT %v] Message from server: %v", c.config.ID, msg)
-
 	c.conn.Close()
 }

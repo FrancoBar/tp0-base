@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/binary"
+	"fmt"
 	"net"
 	"io"
 )
@@ -32,6 +33,12 @@ func _serialize_uint32(u uint32) []byte{
 	return _append_lenght(data)
 }
 
+func _serialize_uint64(u uint64) []byte{
+	data := make([]byte, 8)
+	binary.BigEndian.PutUint64(data, u)
+	return _append_lenght(data)
+}
+
 func _serialize_bool(b bool) []byte{
 	data := make([]byte, 1)
 	if b {
@@ -50,12 +57,12 @@ func _serialize_intention(u Intention) []byte{
 }
 
 func _serialize_person_record(p PersonRecord) []byte{
-	name := _serialize_str(p.Name)
-	surname := _serialize_str(p.Surname)
-	dni := _serialize_uint32(p.Dni)
+	first_name := _serialize_str(p.FirstName)
+	last_name := _serialize_str(p.LastName)
+	document :=	_serialize_uint64(p.Document)
 	birthdate := _serialize_str(p.Birthdate)
-	data := append(name, surname...)
-	data = append(data, dni...)
+	data := append(first_name, last_name...)
+	data = append(data, document...)
 	data = append(data, birthdate...)
 	return data
 }
@@ -65,7 +72,6 @@ func _serialize_person_records(ps []PersonRecord) []byte{
 	binary.BigEndian.PutUint32(data, uint32(len(ps)))
 	for _, p := range ps {
 		data = append(data, _serialize_person_record(p)...)
-    // element is the element from someSlice for where we are
 	}
 	return data
 }
@@ -76,75 +82,84 @@ func _serialize_empty() []byte{
 	return data
 }
 
-func Serialize(x interface{}) []byte {
+func Serialize(x interface{}) ([]byte, error) {
     switch y := x.(type) {
         case string:
-             return _serialize_str(y)
+             return _serialize_str(y), nil
         case uint32:
-             return _serialize_uint32(y)
+             return _serialize_uint32(y), nil
+        case uint64:
+             return _serialize_uint64(y), nil
         case Intention:
-        	 return _serialize_intention(y)
+        	 return _serialize_intention(y), nil
         case PersonRecord:
-        	 return _serialize_person_record(y)
+        	 return _serialize_person_record(y), nil
         case []PersonRecord:
-        	 return _serialize_person_records(y)
+        	 return _serialize_person_records(y), nil
         default:
-        	//TODO: Return error
-        	return _serialize_empty()
+        	return nil, fmt.Errorf("Error: %T type is not currently supported", x)
     }
 }
 
 // Send / Recv
-func Send(socket net.Conn, intention Intention, msg interface{}){
-	if intention >= Size{
-		//Err invalid intention
+func _serialize_and_write(socket net.Conn, msg interface{}) error{
+	m, err := Serialize(msg)
+	if err != nil {
+		return err
 	}
-	socket.Write(Serialize(intention))
-	socket.Write(Serialize(msg))
+
+	nwritten_acum := len(m)
+	for ;nwritten_acum > 0; {
+		nwritten, err := socket.Write(m)
+		if err != nil {
+			return err
+		}
+		nwritten_acum -= nwritten
+    	
+	}
+	return nil
+}
+
+func Send(socket net.Conn, intention Intention, msg interface{}) error{
+	if intention >= Size{
+		return fmt.Errorf("Error: Invalid intention", intention)
+	}
+	err := _serialize_and_write(socket, intention)
+	if err != nil {
+		return err
+	}
+	return _serialize_and_write(socket, msg)
 }
 
 
-func _recv_sized(reader io.Reader) []byte{
+func _recv_sized(reader io.Reader) ([]byte, error){
 	buf := make([]byte, 4)
-	if _, err := io.ReadFull(reader, buf); err != nil {
-		//log.Fatal(err)
+	nread, err := io.ReadFull(reader, buf)
+	if err != nil || nread < 4{
+		return nil, io.ErrUnexpectedEOF
 	}
+
 	size := binary.BigEndian.Uint32(buf)
 	buf = make([]byte, size)
-	if _, err := io.ReadFull(reader, buf); err != nil {
-		//log.Fatal(err)
+	nread, err = io.ReadFull(reader, buf)
+	if err != nil || uint32(nread) < size{
+		return nil, io.ErrUnexpectedEOF
 	}
-	return buf
+	return buf, nil
 }
 
-func RecvUint32(reader io.Reader) uint32{
-	return binary.BigEndian.Uint32(_recv_sized(reader))
-}
-
-func RecvStr(reader io.Reader) string{
-	return string(_recv_sized(reader))
-}
-
-func RecvBool(reader io.Reader) bool{
-	return (binary.BigEndian.Uint32(_recv_sized(reader)) != 0)
-}
-
-func RecvPersonRecord(reader io.Reader) PersonRecord{
-	p := PersonRecord{
-		Name: RecvStr(reader),
-		Surname: RecvStr(reader),
-		Dni: RecvUint32(reader),
-		Birthdate: RecvStr(reader),
+func RecvUint32(reader io.Reader) (uint32, error){
+	u, err := _recv_sized(reader)
+	if err != nil{
+		return 0, err
 	}
-	return p
+	return binary.BigEndian.Uint32(u), nil
 }
 
-
-func RecvPersonRecords(reader io.Reader) []PersonRecord{
-	amount := RecvUint32(reader)
-	var ps []PersonRecord
-	for ; amount > 0; amount-- {
-		ps = append(ps, RecvPersonRecord(reader))
+func RecvBool(reader io.Reader) (bool, error){
+	u, err := RecvUint32(reader)
+	if err != nil{
+		return false, err
 	}
-	return ps
+	return  (u != 0), nil
 }

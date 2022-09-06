@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
+	"strconv"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -106,13 +106,18 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	p := common.PersonRecord{
-		Name: "Eva",
-		Surname: "Martinez",
-		Dni: 123456789,
-		Birthdate: "12-12-1998",
+	document, err := strconv.ParseUint(v.GetString("document"), 10, 32)
+	if err != nil {
+		log.Fatalf("%s", err)
 	}
 
-	client := common.NewClient(clientConfig, p)
+	personRecord := common.PersonRecord{
+		FirstName:	v.GetString("first.name"),
+		LastName:	v.GetString("last.name"),
+		Document: 	document,
+		Birthdate:	v.GetString("birthdate"),
+	}
+
+	client := common.NewClient(clientConfig, personRecord)
 	client.Start()
 }

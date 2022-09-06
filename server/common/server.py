@@ -1,6 +1,8 @@
 import socket
 import logging
+from .utils import *
 from .transmition import *
+from asyncio import IncompleteReadError
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -36,12 +38,22 @@ class Server:
         If a problem arises in the communication with the client, the
         client socket will also be closed
         """
-        logging.debug('Espero persona')
-        personrecord = Recv(client_sock)
-        print(personrecord)
-        logging.debug('Envío respuesta')
-        Send(socket, 1)
-        client_sock.close()
+        try:
+            logging.debug('Awaiting person record reception')
+            personrecord = recv(client_sock)
+            logging.debug('First Name: ' + str(personrecord.first_name))
+            logging.debug('Last Name: ' + str(personrecord.last_name))
+            logging.debug('Document: ' + str(personrecord.document))
+            logging.debug('Birthdate: ' + str(personrecord.birthdate))
+
+            logging.debug('Sending back result')
+            send(client_sock, 1 if is_winner(personrecord) else 0)
+        except InvalidIntentionError:
+            logging.info('Error: Client sent an invalid intention')
+        except (OSError, IncompleteReadError) as e:
+            logging.info("{}".format(e))
+        finally:
+            client_sock.close()
 
     def __accept_new_connection(self):
         """

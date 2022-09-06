@@ -2,6 +2,7 @@
 
 import os
 import logging
+import signal
 from configparser import ConfigParser
 from common.server import Server
 
@@ -44,6 +45,10 @@ def main():
 
     # Initialize server and start server loop
     server = Server(config_params["port"], config_params["listen_backlog"])
+
+    # Signal handling
+    signal.signal(signal.SIGTERM, server.sigterm_handler)
+
     server.run()
 
 
