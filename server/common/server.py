@@ -41,10 +41,7 @@ class Server:
         try:
             logging.debug('Awaiting person record reception')
             personrecord = recv(client_sock)
-            logging.debug('First Name: ' + str(personrecord.first_name))
-            logging.debug('Last Name: ' + str(personrecord.last_name))
-            logging.debug('Document: ' + str(personrecord.document))
-            logging.debug('Birthdate: ' + str(personrecord.birthdate))
+            logging.debug(personrecord)
 
             logging.debug('Sending back result')
             send(client_sock, 1 if is_winner(personrecord) else 0)

@@ -32,14 +32,14 @@ def _recv_n_bytes(socket, num_bytes):
 	If no bytes are read from the socket IncompleteReadError is raised
 	Source: https://stackoverflow.com/questions/55825905/how-can-i-reliably-read-exactly-n-bytes-from-a-tcp-socket
 	"""
-    buf = bytearray(num_bytes)
-    pos = 0
-    while pos < num_bytes:
-        n = socket.recv_into(memoryview(buf)[pos:])
-        if n == 0:
-            raise IncompleteReadError(bytes(buf[:pos]), num_bytes)
-        pos += n
-    return bytes(buf)
+	buf = bytearray(num_bytes)
+	pos = 0
+	while pos < num_bytes:
+		n = socket.recv_into(memoryview(buf)[pos:])
+		if n == 0:
+			raise IncompleteReadError(bytes(buf[:pos]), num_bytes)
+		pos += n
+	return bytes(buf)
 
 def _recv_sized(socket):
 	size = int.from_bytes(_recv_n_bytes(socket, 4), byteorder='big', signed=False)
@@ -61,7 +61,6 @@ def recv_person_record(socket):
 		recv_unsigned_number(socket),
 		recv_str(socket)
 	)
-
 
 def recv(socket):
 	"""

@@ -38,7 +38,7 @@ func InitConfig() (*viper.Viper, error) {
 
 	v.BindEnv("name")
 	v.BindEnv("surname")
-	v.BindEnv("dni")
+	v.BindEnv("document")
 	v.BindEnv("birthdate")
 
 	// Try to read configuration from config file. If config file

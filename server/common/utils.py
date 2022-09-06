@@ -18,6 +18,9 @@ class Contestant:
 	def __hash__(self):
 		return hash((self.first_name, self.last_name, self.document, self.birthdate))
 
+	def __str__(self):
+		return '\nFirst Name: ' + self.first_name + '\nLast Name: ' + self.last_name + '\nDocument: ' + str(self.document) + '\nBirthdate: ' +str(self.birthdate)
+
 
 """ Checks whether a contestant is a winner or not. """
 def is_winner(contestant: Contestant) -> bool:
