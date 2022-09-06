@@ -18,13 +18,20 @@ def _append_length(data):
 def serialize_uint32(u):
 	return _append_length(u.to_bytes(4, 'big'))
 
-# Send / Recv
 def send(socket, msg):
+	"""
+	Serializes and sends uint32s through the provided socket
+	"""
 	m = serialize_uint32(msg)
 	socket.sendall(m)
 
-# Source: https://stackoverflow.com/questions/55825905/how-can-i-reliably-read-exactly-n-bytes-from-a-tcp-socket
+
 def _recv_n_bytes(socket, num_bytes):
+	"""
+	Receives exactly 'num_bytes' bytes through the provided socket.
+	If no bytes are read from the socket IncompleteReadError is raised
+	Source: https://stackoverflow.com/questions/55825905/how-can-i-reliably-read-exactly-n-bytes-from-a-tcp-socket
+	"""
     buf = bytearray(num_bytes)
     pos = 0
     while pos < num_bytes:
@@ -57,6 +64,9 @@ def recv_person_record(socket):
 
 
 def recv(socket):
+	"""
+	Listens to messages through the provided socket. Handles the intention field, even if it isn't currently used.
+	"""
 	intention = recv_intention(socket)
 	if intention != INTENTION_ASKWINNER:
 		raise InvalidIntentionError

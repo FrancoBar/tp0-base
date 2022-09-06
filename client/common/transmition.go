@@ -7,6 +7,7 @@ import (
 	"io"
 )
 
+
 type Intention uint32
 
 const (
@@ -15,7 +16,6 @@ const (
 	Size
 )
 
-// Serialization
 func _append_lenght(data []byte) []byte{
 	length := make([]byte, 4)
     binary.BigEndian.PutUint32(length, uint32(len(data)))
@@ -82,6 +82,7 @@ func _serialize_empty() []byte{
 	return data
 }
 
+// Turns any of the supported types into a byte array representation with the format: size | data
 func Serialize(x interface{}) ([]byte, error) {
     switch y := x.(type) {
         case string:
@@ -101,7 +102,7 @@ func Serialize(x interface{}) ([]byte, error) {
     }
 }
 
-// Send / Recv
+// Turns any of the supported types into a byte array representation with the format: size | data
 func _serialize_and_write(socket net.Conn, msg interface{}) error{
 	m, err := Serialize(msg)
 	if err != nil {
@@ -120,6 +121,7 @@ func _serialize_and_write(socket net.Conn, msg interface{}) error{
 	return nil
 }
 
+// Sends both the intention and its associated data through the provided socket
 func Send(socket net.Conn, intention Intention, msg interface{}) error{
 	if intention >= Size{
 		return fmt.Errorf("Error: Invalid intention", intention)
