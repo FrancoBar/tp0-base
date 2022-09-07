@@ -1,9 +1,9 @@
 import time
 import datetime
-
+import fcntl
 
 """ Winners storage location. """
-STORAGE = "./winners"
+STORAGE = "./output/winners"
 
 
 """ Contestant data model. """
@@ -29,9 +29,11 @@ def is_winner(contestant: Contestant) -> bool:
 	return hash(contestant) % 17 == 0
 
 
-""" Persist the information of each winner in the STORAGE file. Not thread-safe/process-safe. """
+""" Persist the information of each winner in the STORAGE file."""
 def persist_winners(winners: list[Contestant]) -> None:
 	with open(STORAGE, 'a+') as file:
+		fcntl.flock(file, fcntl.LOCK_EX)
 		for winner in winners:
 			file.write(f'Full name: {winner.first_name} {winner.last_name} | Document: {winner.document} | Date of Birth: {winner.birthdate.strftime("%d/%m/%Y")}\n')
+		fcntl.flock(file, fcntl.LOCK_UN)
 

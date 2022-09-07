@@ -1,5 +1,7 @@
+import os
 import socket
 import logging
+import multiprocessing
 from .utils import *
 from .transmition import *
 from asyncio import IncompleteReadError
@@ -14,16 +16,21 @@ class Server:
 
     def run(self):
         """
-        Dummy Server loop
         Server that accept a new connections and establishes a
-        communication with a client. After client with communucation
-        finishes, servers starts to accept new connections again
+        communication with a client. Each connection is handled by
+        a separate process.
         """
-
         while self._open:
             client_sock = self.__accept_new_connection()
             if client_sock:
-                self.__handle_client_connection(client_sock)
+                process = multiprocessing.Process(target=self.__handle_client_connection, args=[client_sock])
+                process.daemon = True
+                process.start()
+        
+        for process in multiprocessing.active_children():
+            logging.debug("Terminating process %r", process)
+            process.terminate()
+            process.join()
         logging.info('Shutting down...')
 
     def sigterm_handler(self, signum, frame):
@@ -39,17 +46,27 @@ class Server:
         client socket will also be closed
         """
         try:
-            logging.debug('Awaiting person record reception')
-            personrecords = recv(client_sock)
-            logging.debug('Received ' + str(len(personrecords)) + ' records')
+            pid = os.getpid()
+            winners = []
 
-            logging.debug('Sending back result')
+            logging.debug('[{}] Awaiting person record reception'.format(pid))
+            personrecords = recv(client_sock)
+            logging.debug('[{}] Received {} records'.format(pid, len(personrecords)))
+
+            logging.debug('[{}] Sending back result'.format(pid))
             for p in personrecords:
-                send(client_sock, 1 if is_winner(p) else 0)
+                if is_winner(p):
+                    winners.append(p)
+                    send(client_sock, 1)
+                else:
+                    send(client_sock, 0)
+
+            logging.debug('[{}] Amount of winners: {}'.format(pid, len(winners)))
+            persist_winners(winners)
         except InvalidIntentionError:
-            logging.info('Error: Client sent an invalid intention')
+            logging.info('[{}] Error: Client sent an invalid intention'.format(pid))
         except (OSError, IncompleteReadError) as e:
-            logging.info("{}".format(e))
+            logging.info("[{}] {}".format(pid, e))
         finally:
             client_sock.close()
 

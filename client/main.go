@@ -38,11 +38,6 @@ func InitConfig() (*viper.Viper, error) {
 	v.BindEnv("loop", "lapse")
 	v.BindEnv("log", "level")
 
-	v.BindEnv("name")
-	v.BindEnv("surname")
-	v.BindEnv("document")
-	v.BindEnv("birthdate")
-
 	// Try to read configuration from config file. If config file
 	// does not exists then ReadInConfig will fail but configuration
 	// can be loaded from the environment variables so we shouldn't
@@ -150,8 +145,7 @@ func main() {
 		log.Fatalf("%s", err)
 	}
 
-
-	lines, err := ReadDataset("dataset-1.csv")
+	lines, err := ReadDataset("datasets/dataset-" + v.GetString("id") + ".csv")
 	if err != nil {
 		log.Fatalf("%s", err)
 	}
