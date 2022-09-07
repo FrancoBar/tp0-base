@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 	"strconv"
+	"os"
+	"encoding/csv"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -86,6 +88,43 @@ func PrintConfig(v *viper.Viper) {
 	logrus.Infof("Log Level: %s", v.GetString("log.level"))
 }
 
+func ReadDataset(path string) ([][]string, error){
+	file, err := os.Open(path)
+	if err != nil {
+		file.Close()
+		return nil, err
+	}
+
+	lines, err := csv.NewReader(file).ReadAll()
+	if err != nil {
+		file.Close()
+		return nil, err
+	}
+
+	file.Close()
+	return lines, nil
+}
+
+func LinesToPersonRecords(lines [][]string) []common.PersonRecord{
+	var batch []common.PersonRecord
+	for _, line := range lines {
+		document, err := strconv.ParseUint(line[2], 10, 32)
+		if err != nil {
+			//Devolver err
+			log.Fatalf("%s", err)
+		}
+
+		p := common.PersonRecord{
+				FirstName:	line[0],
+				LastName:	line[1],
+				Document: 	document,
+				Birthdate:	line[3],
+			}
+		batch = append(batch, p)
+	}
+	return batch
+}
+
 func main() {
 	v, err := InitConfig()
 	if err != nil {
@@ -106,18 +145,18 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	document, err := strconv.ParseUint(v.GetString("document"), 10, 32)
+	//
 	if err != nil {
 		log.Fatalf("%s", err)
 	}
 
-	personRecord := common.PersonRecord{
-		FirstName:	v.GetString("first.name"),
-		LastName:	v.GetString("last.name"),
-		Document: 	document,
-		Birthdate:	v.GetString("birthdate"),
+
+	lines, err := ReadDataset("dataset-1.csv")
+	if err != nil {
+		log.Fatalf("%s", err)
 	}
 
-	client := common.NewClient(clientConfig, personRecord)
+	personRecords := LinesToPersonRecords(lines)
+	client := common.NewClient(clientConfig, personRecords)
 	client.Start()
 }

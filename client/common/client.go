@@ -25,16 +25,16 @@ type PersonRecord struct {
 
 // Client Entity that encapsulates how
 type Client struct {
-	person PersonRecord
+	persons []PersonRecord
 	config ClientConfig
 	conn   net.Conn
 }
 
 // NewClient Initializes a new client receiving the configuration
 // as a parameter
-func NewClient(config ClientConfig, person PersonRecord) *Client {
+func NewClient(config ClientConfig, personRecords []PersonRecord) *Client {
 	client := &Client{
-		person: person,
+		persons: personRecords,
 		config: config,
 	}
 	return client
@@ -62,7 +62,7 @@ func (c *Client) Start() {
 	
 	// Send
 	log.Infof("Sending person query")
-	err := Send(c.conn, AskWinner, c.person)
+	err := Send(c.conn, AskWinner, c.persons)
 	if err != nil{
 		log.Errorf("[CLIENT %v] %v", c.config.ID, err)
 		c.conn.Close()
@@ -70,19 +70,21 @@ func (c *Client) Start() {
 	}
 
 	log.Infof("Awaiting server answer")
+	winners := 0
 	reader := bufio.NewReader(c.conn)
-	isWinner, err := RecvBool(reader)
-	if err != nil{
-		log.Errorf("[CLIENT %v] %v", c.config.ID, err)
-		c.conn.Close()
-		return
+	for i := 0; i < len(c.persons); i++ {
+		isWinner, err := RecvBool(reader)
+		if err != nil{
+			log.Errorf("[CLIENT %v] %v", c.config.ID, err)
+			c.conn.Close()
+			return
+		}
+
+		if isWinner{
+			winners++
+		}
 	}
 
-	if isWinner{
-		log.Infof("It's a winner")
-	}else{
-		log.Infof("It isn't a winner")
-	}
-	
+	log.Infof("Total records: %v, Winners: %v %%", len(c.persons), (winners*100)/len(c.persons))
 	c.conn.Close()
 }

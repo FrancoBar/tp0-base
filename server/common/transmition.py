@@ -62,6 +62,14 @@ def recv_person_record(socket):
 		recv_str(socket)
 	)
 
+def _recv_vector(socket, recv_type):
+	vec_len = recv_unsigned_number(socket)
+	vec = []
+	while vec_len > 0:
+		vec.append(recv_type(socket))
+		vec_len -= 1
+	return vec
+
 def recv(socket):
 	"""
 	Listens to messages through the provided socket. Handles the intention field, even if it isn't currently used.
@@ -69,4 +77,4 @@ def recv(socket):
 	intention = recv_intention(socket)
 	if intention != INTENTION_ASKWINNER:
 		raise InvalidIntentionError
-	return recv_person_record(socket)
+	return _recv_vector(socket, recv_person_record)

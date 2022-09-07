@@ -68,8 +68,7 @@ func _serialize_person_record(p PersonRecord) []byte{
 }
 
 func _serialize_person_records(ps []PersonRecord) []byte{
-	data := make([]byte, 4)
-	binary.BigEndian.PutUint32(data, uint32(len(ps)))
+	data := _serialize_uint32(uint32(len(ps)))
 	for _, p := range ps {
 		data = append(data, _serialize_person_record(p)...)
 	}

@@ -40,11 +40,12 @@ class Server:
         """
         try:
             logging.debug('Awaiting person record reception')
-            personrecord = recv(client_sock)
-            logging.debug(personrecord)
+            personrecords = recv(client_sock)
+            logging.debug('Received ' + str(len(personrecords)) + ' records')
 
             logging.debug('Sending back result')
-            send(client_sock, 1 if is_winner(personrecord) else 0)
+            for p in personrecords:
+                send(client_sock, 1 if is_winner(p) else 0)
         except InvalidIntentionError:
             logging.info('Error: Client sent an invalid intention')
         except (OSError, IncompleteReadError) as e:
