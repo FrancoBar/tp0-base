@@ -36,4 +36,3 @@ def persist_winners(winners: list[Contestant]) -> None:
 		for winner in winners:
 			file.write(f'Full name: {winner.first_name} {winner.last_name} | Document: {winner.document} | Date of Birth: {winner.birthdate.strftime("%d/%m/%Y")}\n')
 		fcntl.flock(file, fcntl.LOCK_UN)
-
