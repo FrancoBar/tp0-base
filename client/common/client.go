@@ -62,15 +62,6 @@ loop:
 
 		// Create the connection the server in every loop iteration. 
 		c.createClientSocket()
-		select {
-		case <-timeout:
-			break loop
-		case <- c.signals:
-			log.Infof("[CLIENT %v] SIGTERM or SIGINT received.", c.config.ID)
-			break loop
-		// Wait a time between sending one message and the next one
-		case <-time.After(c.config.LoopPeriod):
-		}
 
 		// Send
 		fmt.Fprintf(
@@ -93,6 +84,16 @@ loop:
 		}
 		log.Infof("[CLIENT %v] Message from server: %v", c.config.ID, msg)
 
+		select {
+		case <-timeout:
+			break loop
+		case <- c.signals:
+			log.Infof("[CLIENT %v] SIGTERM or SIGINT received.", c.config.ID)
+			break loop
+		// Wait a time between sending one message and the next one
+		case <-time.After(c.config.LoopPeriod):
+		}
+		
 		// Recreate connection to the server
 		c.conn.Close()
 	}
