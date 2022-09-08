@@ -16,15 +16,24 @@ def _append_length(data):
 	return len(data).to_bytes(4, 'big') + data
 
 def serialize_uint32(u):
-	return _append_length(u.to_bytes(4, 'big'))
+	return u.to_bytes(4, 'big')
 
-def send(socket, msg):
+def serialize_bool(u):
+	return int(u).to_bytes(1, 'big')
+
+def send_uint32(socket, msg):
 	"""
 	Serializes and sends uint32s through the provided socket
 	"""
 	m = serialize_uint32(msg)
 	socket.sendall(m)
 
+def send_bool(socket, msg):
+	"""
+	Serializes and sends uint32s through the provided socket
+	"""
+	m = serialize_bool(msg)
+	socket.sendall(m)
 
 def _recv_n_bytes(socket, num_bytes):
 	"""
@@ -45,30 +54,42 @@ def _recv_sized(socket):
 	size = int.from_bytes(_recv_n_bytes(socket, 4), byteorder='big', signed=False)
 	return _recv_n_bytes(socket, size)
 
-def recv_intention(socket):
-	return int.from_bytes(_recv_n_bytes(socket, 4), byteorder='big', signed=False)
-
 def recv_str(socket):
 	return _recv_sized(socket).decode('utf-8')
 
-def recv_unsigned_number(socket):
-	return int.from_bytes(_recv_sized(socket), byteorder='big', signed=False)
+def _recv_unsigned_number(socket, size):
+	return int.from_bytes(_recv_n_bytes(socket, size), byteorder='big', signed=False)
 
-def recv_person_record(socket):
-	return Contestant(
-		recv_str(socket),
-		recv_str(socket),
-		recv_unsigned_number(socket),
-		recv_str(socket)
-	)
+def recv_uint32(socket):
+	return _recv_unsigned_number(socket, 4)
+
+def recv_uint64(socket):
+	return _recv_unsigned_number(socket, 8)
+
+def recv_unsigned_number(socket, size):
+	return int.from_bytes(_recv_n_bytes(socket, size), byteorder='big', signed=False)
+
+def recv_intention(socket):
+	return int.from_bytes(_recv_n_bytes(socket, 4), byteorder='big', signed=False)
+
 
 def recv_vector(socket, recv_type):
-	vec_len = recv_unsigned_number(socket)
+	vec_len = recv_uint32(socket)
 	vec = []
 	while vec_len > 0:
 		vec.append(recv_type(socket))
 		vec_len -= 1
 	return vec
+
+def recv_person_record(socket):
+	return Contestant(
+		recv_str(socket),
+		recv_str(socket),
+		recv_uint64(socket),
+		recv_str(socket)
+	)
+
+
 
 def recv(socket):
 	"""

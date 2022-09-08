@@ -15,14 +15,6 @@ type ClientConfig struct {
 	LoopPeriod    time.Duration
 }
 
-// Record used by the client to represent a person
-type PersonRecord struct {
-	FirstName string
-	LastName string
-	Document uint64
-	Birthdate string
-}
-
 // Client Entity that encapsulates how
 type Client struct {
 	persons []PersonRecord
@@ -56,13 +48,30 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-// StartClientLoop Send messages to the client until some time threshold is met
-func (c *Client) Start() {
-	c.createClientSocket()
-	
-	// Send
-	log.Infof("Sending person query")
-	err := Send(c.conn, AskWinner, c.persons)
+func sendAll(socket net.Conn, msg []byte) error{
+	nwritten_acum := len(msg)
+	for ;nwritten_acum > 0; {
+		nwritten, err := socket.Write(msg)
+		if err != nil {
+			return err
+		}
+		nwritten_acum -= nwritten
+	}
+	return nil
+}
+
+func (c *Client) askWinner(){
+log.Infof("Sending person query")
+	msg := SerializeUint32(AskWinner)
+	err := sendAll(c.conn, msg)
+	if err != nil{
+		log.Errorf("[CLIENT %v] %v", c.config.ID, err)
+		c.conn.Close()
+		return
+	}
+
+	msg = SerializePersonRecordArray(c.persons)
+	err = sendAll(c.conn, msg)
 	if err != nil{
 		log.Errorf("[CLIENT %v] %v", c.config.ID, err)
 		c.conn.Close()
@@ -73,7 +82,7 @@ func (c *Client) Start() {
 	winners := 0
 	reader := bufio.NewReader(c.conn)
 	for i := 0; i < len(c.persons); i++ {
-		isWinner, err := RecvBool(reader)
+		isWinner, err := DeserializeBool(reader)
 		if err != nil{
 			log.Errorf("[CLIENT %v] %v", c.config.ID, err)
 			c.conn.Close()
@@ -86,22 +95,29 @@ func (c *Client) Start() {
 	}
 
 	log.Infof("Records sent: %v, Winners: %v %%", len(c.persons), (winners*100)/len(c.persons))
+}
 
+func (c *Client) askAmount(){
+	reader := bufio.NewReader(c.conn)
+	
 	for ;true;{
-		err = SendI(c.conn, AskAmount)
+		log.Infof("Sending amount query")
+		msg := SerializeUint32(AskAmount)
+		err := sendAll(c.conn, msg)
 		if err != nil{
 			log.Errorf("[CLIENT %v] %v", c.config.ID, err)
 			c.conn.Close()
 			return
 		}
 
-		total, err := RecvUint32(reader)
+		log.Infof("Awaiting server answer")
+		total, err := DeserializeUint32(reader)
 		if err != nil{
 			log.Errorf("[CLIENT %v] %v", c.config.ID, err)
 			c.conn.Close()
 			return
 		}
-		partial, err := RecvBool(reader)
+		partial, err := DeserializeBool(reader)
 		if err != nil{
 			log.Errorf("[CLIENT %v] %v", c.config.ID, err)
 			c.conn.Close()
@@ -113,5 +129,12 @@ func (c *Client) Start() {
 		}
 		time.Sleep(8 * time.Second)
 	}
+}
+
+// StartClientLoop Send messages to the client until some time threshold is met
+func (c *Client) Start() {
+	c.createClientSocket()
+	c.askWinner()
+	c.askAmount()
 	c.conn.Close()
 }

@@ -71,9 +71,9 @@ class Server:
         for p in personrecords:
             if is_winner(p):
                 winners.append(p)
-                send(client_sock, 1)
+                send_bool(client_sock, True)
             else:
-                send(client_sock, 0)
+                send_bool(client_sock, False)
 
         logging.debug('[{}] Amount of winners: {}'.format(pid, len(winners)))
         winners_queue[0].put(len(winners))
@@ -82,8 +82,8 @@ class Server:
     def __ask_amount(self, client_sock, winners_queue):
         winners_queue[0].put(0)
         total, partial = winners_queue[1].get()
-        send(client_sock, total)
-        send(client_sock, 1 if partial else 0)
+        send_uint32(client_sock, total)
+        send_bool(client_sock, partial)
 
     def __handle_client_connection(self, client_sock, winners_queue):
         """
