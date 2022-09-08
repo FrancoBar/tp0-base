@@ -6,6 +6,8 @@ import (
 	"time"
 	"strconv"
 	"os"
+	"os/signal"
+	"syscall"
 	"encoding/csv"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -105,7 +107,6 @@ func LinesToPersonRecords(lines [][]string) []common.PersonRecord{
 	for _, line := range lines {
 		document, err := strconv.ParseUint(line[2], 10, 32)
 		if err != nil {
-			//Devolver err
 			log.Fatalf("%s", err)
 		}
 
@@ -140,17 +141,15 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	//
-	if err != nil {
-		log.Fatalf("%s", err)
-	}
-
 	lines, err := ReadDataset("datasets/dataset-" + v.GetString("id") + ".csv")
 	if err != nil {
 		log.Fatalf("%s", err)
 	}
 
+	signals := make(chan os.Signal, 1)
+    signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+
 	personRecords := LinesToPersonRecords(lines)
-	client := common.NewClient(clientConfig, personRecords)
+	client := common.NewClient(clientConfig, signals, personRecords)
 	client.Start()
 }

@@ -1,16 +1,16 @@
 import os
+import signal
 import socket
 import logging
-import time
 import multiprocessing
 from asyncio import IncompleteReadError
 from .utils import *
 from .transmition import *
 from .serialize import *
+from .sumer import *
 
 INTENTION_ASK_WINNER = 0
 INTENTION_ASK_AMOUNT = 1
-BUSY_SERVER_TOLERANCE = 4
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -26,8 +26,9 @@ class Server:
         communication with a client. Each connection is handled by
         a separate process.
         """
-        winners_queue = (multiprocessing.Queue(), multiprocessing.Queue()) 
-        process = multiprocessing.Process(target=self.__sum_winners, args=[winners_queue])
+        winners_queue = (multiprocessing.Queue(), multiprocessing.Queue())
+        sumer = Sumer(winners_queue) 
+        process = multiprocessing.Process(target=sumer.sum)
         process.start()
         
         while self._open:
@@ -37,33 +38,19 @@ class Server:
                 process.daemon = True
                 process.start()
 
-    def sigterm_handler(self, signum, frame):
-        logging.debug('SIGTERM received')
-        self._open = False
-        logging.debug('Closing socket')
-        self._server_socket.close()
-
+        winners_queue[0].close()
+        winners_queue[1].close()
         for process in multiprocessing.active_children():
             logging.debug("Terminating process %r", process)
             process.terminate()
             process.join()
         logging.info('Shutting down...')
 
-    def __sum_winners(self, winners_queue):
-        inputq, outputq = winners_queue
-        total = 0
-        last_time = time.time()
-        partial = False
-        while self._open:
-            delta = inputq.get()
-            if delta == 0:
-                actual_time = time.time()
-                partial = (actual_time - last_time < BUSY_SERVER_TOLERANCE)
-                outputq.put((total, partial))
-            else:
-                last_time = time.time()
-                total += delta
-            
+    def sigterm_handler(self, signum, frame):
+        logging.debug('SIGTERM received')
+        self._open = False
+        logging.debug('Closing socket')
+        self._server_socket.close()            
 
     def __ask_winner(self, client_sock, winners_queue):
         pid = os.getpid()
@@ -79,8 +66,10 @@ class Server:
                 winners.append(p)
             send_bool(client_sock, has_won)
 
-        logging.debug('[{}] Amount of winners: {}'.format(pid, len(winners)))
-        winners_queue[0].put(len(winners))
+        winners_amount = len(winners)
+        logging.debug('[{}] Amount of winners: {}'.format(pid, winners_amount))
+        if winners_amount != 0: 
+            winners_queue[0].put(winners_amount)
         persist_winners(winners)
 
     def __ask_amount(self, client_sock, winners_queue):
@@ -106,9 +95,9 @@ class Server:
                 else:
                     logging.info('[{}] Error: Client sent an invalid intention'.format(pid))
 
-        except IncompleteReadError:
-            pass
-        except OSError as e:
+        except IncompleteReadError as e:
+            logging.debug("[{}] {}".format(pid, e))
+        except (OSError, ValueError) as e:
             logging.info("[{}] {}".format(pid, e))
         finally:
             client_sock.close()

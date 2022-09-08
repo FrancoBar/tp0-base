@@ -1,6 +1,7 @@
 package common
 
 import (
+	"os"
 	"net"
 	"time"
 	"bufio"
@@ -17,16 +18,18 @@ type ClientConfig struct {
 
 // Client Entity that encapsulates how
 type Client struct {
-	persons []PersonRecord
+	signals chan os.Signal
+	people []PersonRecord
 	config ClientConfig
 	conn   net.Conn
 }
 
 // NewClient Initializes a new client receiving the configuration
 // as a parameter
-func NewClient(config ClientConfig, personRecords []PersonRecord) *Client {
+func NewClient(config ClientConfig, signals chan os.Signal, personRecords []PersonRecord) *Client {
 	client := &Client{
-		persons: personRecords,
+		signals: signals,
+		people: personRecords,
 		config: config,
 	}
 	return client
@@ -61,7 +64,7 @@ func sendAll(socket net.Conn, msg []byte) error{
 }
 
 func (c *Client) askWinner(){
-log.Infof("Sending person query")
+	log.Debugf("[CLIENT %v] Sending people query", c.config.ID)
 	msg := SerializeUint32(AskWinner)
 	err := sendAll(c.conn, msg)
 	if err != nil{
@@ -70,7 +73,7 @@ log.Infof("Sending person query")
 		return
 	}
 
-	msg = SerializePersonRecordArray(c.persons)
+	msg = SerializePersonRecordArray(c.people)
 	err = sendAll(c.conn, msg)
 	if err != nil{
 		log.Errorf("[CLIENT %v] %v", c.config.ID, err)
@@ -78,10 +81,10 @@ log.Infof("Sending person query")
 		return
 	}
 
-	log.Infof("Awaiting server answer")
+	log.Debugf("[CLIENT %v] Awaiting server answer", c.config.ID)
 	winners := 0
 	reader := bufio.NewReader(c.conn)
-	for i := 0; i < len(c.persons); i++ {
+	for i := 0; i < len(c.people); i++ {
 		isWinner, err := DeserializeBool(reader)
 		if err != nil{
 			log.Errorf("[CLIENT %v] %v", c.config.ID, err)
@@ -94,14 +97,14 @@ log.Infof("Sending person query")
 		}
 	}
 
-	log.Infof("Records sent: %v, Winners: %v %%", len(c.persons), (winners*100)/len(c.persons))
+	log.Infof("Records sent: %v, Winners: %v %%", len(c.people), (winners*100)/len(c.people))
 }
 
 func (c *Client) askAmount(){
 	reader := bufio.NewReader(c.conn)
 	
 	for ;true;{
-		log.Infof("Sending amount query")
+		log.Debugf("[CLIENT %v] Sending amount query", c.config.ID)
 		msg := SerializeUint32(AskAmount)
 		err := sendAll(c.conn, msg)
 		if err != nil{
@@ -110,7 +113,7 @@ func (c *Client) askAmount(){
 			return
 		}
 
-		log.Infof("Awaiting server answer")
+		log.Debugf("[CLIENT %v] Awaiting server answer", c.config.ID)
 		total, err := DeserializeUint32(reader)
 		if err != nil{
 			log.Errorf("[CLIENT %v] %v", c.config.ID, err)
@@ -123,11 +126,19 @@ func (c *Client) askAmount(){
 			c.conn.Close()
 			return
 		}
-		log.Infof("Total winners: %v, Partial: %v", total, partial)
+		log.Infof("[CLIENT %v] Total winners: %v, Partial: %v", c.config.ID, total, partial)
 		if !partial {
 			break
 		}
-		time.Sleep(8 * time.Second)
+
+		select{
+			case <- c.signals:
+			log.Debugf("[CLIENT %v] SIGTERM or SIGINT received.", c.config.ID)
+			break
+
+			// Wait some time before retrying
+			case <-time.After(c.config.LoopPeriod):
+		}
 	}
 }
 
