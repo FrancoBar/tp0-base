@@ -15,14 +15,6 @@ type ClientConfig struct {
 	LoopPeriod    time.Duration
 }
 
-// Record used by the client to represent a person
-type PersonRecord struct {
-	FirstName string
-	LastName string
-	Document uint64
-	Birthdate string
-}
-
 // Client Entity that encapsulates how
 type Client struct {
 	person PersonRecord
@@ -56,13 +48,34 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
+func sendAll(socket net.Conn, msg []byte) error{
+	nwritten_acum := len(msg)
+	for ;nwritten_acum > 0; {
+		nwritten, err := socket.Write(msg)
+		if err != nil {
+			return err
+		}
+		nwritten_acum -= nwritten
+	}
+	return nil
+}
+
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) Start() {
 	c.createClientSocket()
 	
 	// Send
 	log.Infof("Sending person query")
-	err := Send(c.conn, AskWinner, c.person)
+	msg := SerializeUint32(AskWinner)
+	err := sendAll(c.conn, msg)
+	if err != nil{
+		log.Errorf("[CLIENT %v] %v", c.config.ID, err)
+		c.conn.Close()
+		return
+	}
+
+	msg = SerializePersonRecord(c.person)
+	err = sendAll(c.conn, msg)
 	if err != nil{
 		log.Errorf("[CLIENT %v] %v", c.config.ID, err)
 		c.conn.Close()
@@ -71,7 +84,7 @@ func (c *Client) Start() {
 
 	log.Infof("Awaiting server answer")
 	reader := bufio.NewReader(c.conn)
-	isWinner, err := RecvBool(reader)
+	isWinner, err := DeserializeBool(reader)
 	if err != nil{
 		log.Errorf("[CLIENT %v] %v", c.config.ID, err)
 		c.conn.Close()
@@ -83,6 +96,7 @@ func (c *Client) Start() {
 	}else{
 		log.Infof("It isn't a winner")
 	}
+
 	
 	c.conn.Close()
 }

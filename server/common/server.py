@@ -1,8 +1,14 @@
+import os
+import signal
 import socket
 import logging
+from asyncio import IncompleteReadError
 from .utils import *
 from .transmition import *
-from asyncio import IncompleteReadError
+from .serialize import *
+
+INTENTION_ASK_WINNER = 0
+INTENTION_ASK_AMOUNT = 1
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -32,25 +38,37 @@ class Server:
         logging.debug('Closing socket')
         self._server_socket.close()
 
-    def __handle_client_connection(self, client_sock):
-        """
-        Read message from a specific client socket and closes the socket
-        If a problem arises in the communication with the client, the
-        client socket will also be closed
-        """
-        try:
-            logging.debug('Awaiting person record reception')
-            personrecord = recv(client_sock)
-            logging.debug(personrecord)
+    def __ask_winner(self, client_sock):
+        pid = os.getpid()
 
-            logging.debug('Sending back result')
-            send(client_sock, 1 if is_winner(personrecord) else 0)
-        except InvalidIntentionError:
-            logging.info('Error: Client sent an invalid intention')
-        except (OSError, IncompleteReadError) as e:
-            logging.info("{}".format(e))
-        finally:
-            client_sock.close()
+        logging.debug('[{}] Awaiting person record reception'.format(pid))
+        personrecord = recv_person_record(client_sock)
+        logging.debug(personrecord)
+
+        logging.debug('[{}] Sending back result'.format(pid))
+        send_bool(client_sock, is_winner(personrecord))
+
+    def __handle_client_connection(self, client_sock):
+            """
+            Read message from a specific client socket and closes the socket
+            If a problem arises in the communication with the client, the
+            client socket will also be closed
+            """
+            try:
+                pid = os.getpid()
+                while self._open:
+                    intention = recv_uint32(client_sock)
+                    if intention == INTENTION_ASK_WINNER:
+                        self.__ask_winner(client_sock)
+                    else:
+                        logging.info('[{}] Error: Client sent an invalid intention'.format(pid))
+
+            except IncompleteReadError as e:
+                logging.debug("[{}] {}".format(pid, e))
+            except (OSError, ValueError) as e:
+                logging.info("[{}] {}".format(pid, e))
+            finally:
+                client_sock.close()
 
     def __accept_new_connection(self):
         """
