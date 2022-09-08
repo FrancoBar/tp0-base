@@ -85,6 +85,33 @@ func (c *Client) Start() {
 		}
 	}
 
-	log.Infof("Total records: %v, Winners: %v %%", len(c.persons), (winners*100)/len(c.persons))
+	log.Infof("Records sent: %v, Winners: %v %%", len(c.persons), (winners*100)/len(c.persons))
+
+	for ;true;{
+		err = SendI(c.conn, AskAmount)
+		if err != nil{
+			log.Errorf("[CLIENT %v] %v", c.config.ID, err)
+			c.conn.Close()
+			return
+		}
+
+		total, err := RecvUint32(reader)
+		if err != nil{
+			log.Errorf("[CLIENT %v] %v", c.config.ID, err)
+			c.conn.Close()
+			return
+		}
+		partial, err := RecvBool(reader)
+		if err != nil{
+			log.Errorf("[CLIENT %v] %v", c.config.ID, err)
+			c.conn.Close()
+			return
+		}
+		log.Infof("Total winners: %v, Partial: %v", total, partial)
+		if !partial {
+			break
+		}
+		time.Sleep(8 * time.Second)
+	}
 	c.conn.Close()
 }

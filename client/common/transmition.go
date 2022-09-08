@@ -120,6 +120,11 @@ func _serialize_and_write(socket net.Conn, msg interface{}) error{
 	return nil
 }
 
+
+func SendI(socket net.Conn, intention Intention) error{
+	return _serialize_and_write(socket, intention)
+}
+
 // Sends both the intention and its associated data through the provided socket
 func Send(socket net.Conn, intention Intention, msg interface{}) error{
 	if intention >= Size{

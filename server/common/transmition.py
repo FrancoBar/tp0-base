@@ -5,8 +5,8 @@ import socket
 
 
 
-INTENTION_ASKWINNER = 0
-INTENTION_ASKAMOUNT = 1
+INTENTION_ASK_WINNER = 0
+INTENTION_ASK_AMOUNT = 1
 
 class InvalidIntentionError(Exception):
     pass
@@ -62,7 +62,7 @@ def recv_person_record(socket):
 		recv_str(socket)
 	)
 
-def _recv_vector(socket, recv_type):
+def recv_vector(socket, recv_type):
 	vec_len = recv_unsigned_number(socket)
 	vec = []
 	while vec_len > 0:
@@ -75,6 +75,6 @@ def recv(socket):
 	Listens to messages through the provided socket. Handles the intention field, even if it isn't currently used.
 	"""
 	intention = recv_intention(socket)
-	if intention != INTENTION_ASKWINNER:
+	if intention != INTENTION_ASK_WINNER:
 		raise InvalidIntentionError
-	return _recv_vector(socket, recv_person_record)
+	return recv_vector(socket, recv_person_record)
