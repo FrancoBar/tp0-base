@@ -1,11 +1,16 @@
 import os
 import socket
 import logging
-import multiprocessing
 import time
+import multiprocessing
+from asyncio import IncompleteReadError
 from .utils import *
 from .transmition import *
-from asyncio import IncompleteReadError
+from .serialize import *
+
+INTENTION_ASK_WINNER = 0
+INTENTION_ASK_AMOUNT = 1
+BUSY_SERVER_TOLERANCE = 4
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -31,18 +36,18 @@ class Server:
                 process = multiprocessing.Process(target=self.__handle_client_connection, args=[client_sock, winners_queue])
                 process.daemon = True
                 process.start()
-        
-        for process in multiprocessing.active_children():
-            logging.debug("Terminating process %r", process)
-            process.terminate()
-            process.join()
-        logging.info('Shutting down...')
 
     def sigterm_handler(self, signum, frame):
         logging.debug('SIGTERM received')
         self._open = False
         logging.debug('Closing socket')
         self._server_socket.close()
+
+        for process in multiprocessing.active_children():
+            logging.debug("Terminating process %r", process)
+            process.terminate()
+            process.join()
+        logging.info('Shutting down...')
 
     def __sum_winners(self, winners_queue):
         inputq, outputq = winners_queue
@@ -53,7 +58,7 @@ class Server:
             delta = inputq.get()
             if delta == 0:
                 actual_time = time.time()
-                partial = (actual_time - last_time < 4)
+                partial = (actual_time - last_time < BUSY_SERVER_TOLERANCE)
                 outputq.put((total, partial))
             else:
                 last_time = time.time()
@@ -69,11 +74,10 @@ class Server:
 
         logging.debug('[{}] Sending back result'.format(pid))
         for p in personrecords:
-            if is_winner(p):
+            has_won = is_winner(p)
+            if has_won:
                 winners.append(p)
-                send_bool(client_sock, True)
-            else:
-                send_bool(client_sock, False)
+            send_bool(client_sock, has_won)
 
         logging.debug('[{}] Amount of winners: {}'.format(pid, len(winners)))
         winners_queue[0].put(len(winners))
@@ -93,10 +97,8 @@ class Server:
         """
         try:
             pid = os.getpid()
-
-
             while self._open:
-                intention = recv_intention(client_sock)
+                intention = recv_uint32(client_sock)
                 if intention == INTENTION_ASK_WINNER:
                     self.__ask_winner(client_sock, winners_queue)
                 elif intention == INTENTION_ASK_AMOUNT:
@@ -104,7 +106,9 @@ class Server:
                 else:
                     logging.info('[{}] Error: Client sent an invalid intention'.format(pid))
 
-        except (OSError, IncompleteReadError) as e:
+        except IncompleteReadError:
+            pass
+        except OSError as e:
             logging.info("[{}] {}".format(pid, e))
         finally:
             client_sock.close()
